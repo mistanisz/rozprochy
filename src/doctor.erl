@@ -17,16 +17,16 @@
 
 start(Id) ->
     gen_server:start({local, ?MODULE}, connection, 
-        [Id, ?MODULE, [{<<"res_tasks">>, <<"topic">>}, {<<"info">>, <<"fanout">>}]], []).
+        [Id, ?MODULE, [{<<"tasks">>, <<"topic">>}, {<<"info">>, <<"fanout">>}]], []).
 
 stop() ->
     gen_server:stop(?MODULE).
 
 send_message(Type, Patient) ->
-    gen_server:cast(?MODULE, {<<"new_tasks">>, Type, Patient}).
+    gen_server:cast(?MODULE, {<<"tasks">>, Type, Patient}).
 
 handle_message(<<"info">>, _, Msg) ->
     [Admin, M | _] = Msg,
     io:format("[I] Received info message from ~p: ~p~n", [Admin, M]);
-handle_message(<<"res_tasks">>, _, Message) ->
+handle_message(<<"tasks">>, _, Message) ->
     io:format("Technician response: ~p~n", [Message]).
