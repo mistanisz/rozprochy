@@ -63,8 +63,6 @@ init([Id, Plugin, QueuesWithExchanges]) ->
             create_queue_and_bind(Queue, Exchange, ExType, Channel)
     end, QueuesWithExchanges),
     
-    io:format("queues: ~p~n", [Queues]),
-    
     {ok, #state{plugin = Plugin, connection = Connection, id = Id, channel = Channel, queues = Queues}}.
 
 %%--------------------------------------------------------------------
@@ -100,6 +98,10 @@ handle_cast({Exchange, Type}, #state{id = Id, channel = Channel} = State) ->
     Publish = #'basic.publish'{exchange = Exchange, routing_key = Type},
     amqp_channel:cast(Channel, Publish, #amqp_msg{payload = Id}),
     {noreply, State};
+handle_cast({Exchange, Type, Payload}, #state{channel = Channel} = State) ->
+    Publish = #'basic.publish'{exchange = Exchange, routing_key = Type},
+    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = Payload}),
+    {noreply, State};
 handle_cast(_Request, State) ->
     io:format("Unrecognized message:~p, ~p~n", [_Request, State]),
     {noreply, State}.
@@ -119,7 +121,7 @@ handle_cast(_Request, State) ->
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(#'basic.consume_ok'{}, State) ->
-    {nereply, State};
+    {noreply, State};
 handle_info({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, State) ->
     #state{channel = Channel, plugin = Plugin} = State,
     Plugin:handle_message(Payload),

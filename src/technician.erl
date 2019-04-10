@@ -9,7 +9,7 @@
 -author("Michal Stanisz").
 
 %% API
--export([start/2, stop/0, send_message/1]).
+-export([start/2, stop/0, send_message/2, handle_message/1]).
 
 %%%===================================================================
 %%% API
@@ -22,5 +22,8 @@ start(Id, Types) ->
 stop() ->
     gen_server:stop(?MODULE).
 
-send_message(Type) ->
-    gen_server:cast(?MODULE, {<<"tasks">>, Type}).
+send_message(Type, Payload) ->
+    gen_server:cast(?MODULE, {<<"tasks">>, Type, Payload}).
+
+handle_message(Msg) ->
+    io:format("Technician received message:~p~n", [Msg]).

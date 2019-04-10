@@ -22,7 +22,7 @@ start(Id) ->
 stop() ->
     gen_server:stop(?MODULE).
 
-send_message(Type) ->
+send_message(Type, Patient) ->
     gen_server:cast(?MODULE, {<<"tasks">>, Type}).
 
 handle_message(Message) ->
