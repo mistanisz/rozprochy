@@ -58,9 +58,11 @@ init([Id, Plugin, QueuesWithExchanges]) ->
     %% Create and bind exchanges
     Queues = lists:map(fun
         ({Exchange, ExType}) ->
-            create_queue_and_bind(Id, Exchange, ExType, Channel);
+            create_queue_and_bind(Id, Id, Exchange, ExType, Channel);
         ({Queue, Exchange, ExType}) ->
-            create_queue_and_bind(Queue, Exchange, ExType, Channel)
+            create_queue_and_bind(Queue, Queue, Exchange, ExType, Channel);
+        ({Queue, Bind, Exchange, ExType}) ->
+            create_queue_and_bind(Queue, Bind, Exchange, ExType, Channel)
     end, QueuesWithExchanges),
     
     {ok, #state{plugin = Plugin, connection = Connection, id = Id, channel = Channel, queues = Queues}}.
@@ -94,13 +96,9 @@ handle_call(_Request, _From, State) ->
     {noreply, NewState :: #state{}} |
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
-handle_cast({Exchange, Type}, #state{id = Id, channel = Channel} = State) ->
+handle_cast({Exchange, Type, Payload}, #state{id = Id, channel = Channel} = State) ->
     Publish = #'basic.publish'{exchange = Exchange, routing_key = Type},
-    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = Id}),
-    {noreply, State};
-handle_cast({Exchange, Type, Payload}, #state{channel = Channel} = State) ->
-    Publish = #'basic.publish'{exchange = Exchange, routing_key = Type},
-    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = Payload}),
+    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = serialize_message([Id, Payload])}),
     {noreply, State};
 handle_cast(_Request, State) ->
     io:format("Unrecognized message:~p, ~p~n", [_Request, State]),
@@ -122,9 +120,10 @@ handle_cast(_Request, State) ->
     {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(#'basic.consume_ok'{}, State) ->
     {noreply, State};
-handle_info({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, State) ->
+handle_info({#'basic.deliver'{} = Deliver, #amqp_msg{payload = Payload}}, State) ->
+    #'basic.deliver'{delivery_tag = Tag, routing_key = Key, exchange = Exchange} = Deliver,
     #state{channel = Channel, plugin = Plugin} = State,
-    Plugin:handle_message(Payload),
+    Plugin:handle_message(Exchange, Key, deserialize_message(Payload)),
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag}),
     {noreply, State};
 handle_info(Info, State) ->
@@ -156,7 +155,7 @@ terminate(_Reason, #state{connection = Connection, channel = Channel, queues = Q
 %%% Internal functions
 %%%===================================================================
 
-create_queue_and_bind(Q, Exchange, ExType, Channel) ->
+create_queue_and_bind(Q, Bind, Exchange, ExType, Channel) ->
     #'queue.declare_ok'{} = amqp_channel:call(Channel, #'queue.declare'{queue = Q}),
     
     ExDeclare = #'exchange.declare'{
@@ -167,7 +166,7 @@ create_queue_and_bind(Q, Exchange, ExType, Channel) ->
     Binding = #'queue.bind'{
         queue = Q,
         exchange = Exchange,
-        routing_key = Q
+        routing_key = Bind
     },
 
     %% Bind queue
@@ -175,3 +174,13 @@ create_queue_and_bind(Q, Exchange, ExType, Channel) ->
     Sub = #'basic.consume'{queue = Q},
     #'basic.consume_ok'{} = amqp_channel:call(Channel, Sub),
     Q.
+
+
+serialize_message(Payload) when is_binary(Payload) ->
+    serialize_message([Payload]);
+serialize_message(PayloadList) ->
+    WithHashes = lists:map(fun(E) -> [E, <<"#">>] end, lists:flatten(PayloadList)),
+    binary:list_to_bin(lists:flatten(WithHashes)).
+
+deserialize_message(Payload) ->
+    binary:split(Payload, <<"#">>, [global, trim]).

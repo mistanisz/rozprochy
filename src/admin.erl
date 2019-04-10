@@ -5,28 +5,26 @@
 %%% 
 %%% @end
 %%%-------------------------------------------------------------------
--module(doctor).
+-module(admin).
 -author("Michal Stanisz").
 
 %% API
--export([start/1, stop/0, send_message/2, handle_message/3]).
+-export([start/1, stop/0, send_message/1, handle_message/3]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 start(Id) ->
+    lists:map(fun(Ex) -> {<<Id/binary, "_", Ex/binary>>, <<"#">>, Ex, <<"topic">>}, [<<"res_tasks">>]
     gen_server:start({local, ?MODULE}, connection, 
-        [Id, ?MODULE, [{<<"res_tasks">>, <<"topic">>}, {<<"info">>, <<"fanout">>}]], []).
+        [Id, ?MODULE, [{<<Id/binary, "1">>, <<"#">>, <<"res_tasks">>, <<"topic">>}]], []).
 
 stop() ->
     gen_server:stop(?MODULE).
 
-send_message(Type, Patient) ->
-    gen_server:cast(?MODULE, {<<"new_tasks">>, Type, Patient}).
+send_message(Message) ->
+    gen_server:cast(?MODULE, {<<"info">>, <<"">>, Message}).
 
-handle_message(<<"info">>, _, Msg) ->
-    [Admin, M | _] = Msg,
-    io:format("[I] Received info message from ~p: ~p~n", [Admin, M]);
-handle_message(<<"res_tasks">>, _, Message) ->
-    io:format("Technician response: ~p~n", [Message]).
+handle_message(_, Key, Message) ->
+    io:format("[L] ~p ~p~n", [Key, Message]).
