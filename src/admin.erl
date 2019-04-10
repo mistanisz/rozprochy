@@ -16,9 +16,10 @@
 %%%===================================================================
 
 start(Id) ->
-    lists:map(fun(Ex) -> {<<Id/binary, "_", Ex/binary>>, <<"#">>, Ex, <<"topic">>}, [<<"res_tasks">>]
-    gen_server:start({local, ?MODULE}, connection, 
-        [Id, ?MODULE, [{<<Id/binary, "1">>, <<"#">>, <<"res_tasks">>, <<"topic">>}]], []).
+    Queues = lists:map(fun(Ex) -> 
+        {<<Id/binary, "_", Ex/binary>>, <<"#">>, Ex, <<"topic">>} 
+    end, [<<"res_tasks">>, <<"new_tasks">>]),
+    gen_server:start({local, ?MODULE}, connection, [Id, ?MODULE, Queues], []).
 
 stop() ->
     gen_server:stop(?MODULE).
