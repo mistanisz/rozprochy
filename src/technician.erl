@@ -16,11 +16,10 @@
 %%%===================================================================
 
 start(Id, Types) ->
-    gen_server:start({local, ?MODULE}, connection, 
-        [Id, ?MODULE, [{Type, <<"tasks">>, <<"topic">>} || Type <- Types] ++ [{<<"info">>, <<"fanout">>}]], []),
     P = spawn(fun loop/0),
     register(loop, P),
-    ok.
+    gen_server:start({local, ?MODULE}, connection, 
+        [Id, ?MODULE, [{Type, <<"tasks">>, <<"topic">>} || Type <- Types] ++ [{<<"info">>, <<"fanout">>}]], []).
 
 stop() ->
     gen_server:stop(?MODULE).
